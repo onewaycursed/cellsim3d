@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CellSim 3D — интерактивный симулятор клетки</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #05050f;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: #e0e8ff;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    canvas { display: block; }
+    #app { width: 100%; height: 100%; }
+
+    /* ============================================================
+       Левая панель со сценариями
+       ============================================================ */
+    #ui-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 280px;
+      height: 100%;
+      background: rgba(10, 15, 35, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-right: 1px solid rgba(80, 140, 255, 0.3);
+      padding: 20px;
+      overflow-y: auto;
+      z-index: 10;
+    }
+
+    .ui-title h1 {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+      background: linear-gradient(90deg, #66aaff, #aa66ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      font-size: 11px;
+      color: #6677aa;
+      margin-bottom: 20px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .ui-section-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #5566aa;
+      margin: 16px 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid rgba(80, 140, 255, 0.15);
+    }
+
+    .scenario-btn {
+      display: block;
+      width: 100%;
+      padding: 10px 14px;
+      margin-bottom: 6px;
+      background: rgba(30, 45, 90, 0.5);
+      border: 1px solid rgba(80, 140, 255, 0.25);
+      border-radius: 6px;
+      color: #c0d0ff;
+      font-size: 12.5px;
+      text-align: left;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .scenario-btn:hover {
+      background: rgba(60, 90, 180, 0.5);
+      border-color: rgba(120, 180, 255, 0.6);
+      transform: translateX(2px);
+    }
+    .scenario-btn.active {
+      background: linear-gradient(90deg, rgba(80, 130, 255, 0.6), rgba(150, 80, 255, 0.6));
+      border-color: #88aaff;
+      color: #fff;
+      box-shadow: 0 0 15px rgba(100, 150, 255, 0.4);
+    }
+
+    /* ============================================================
+       Инфо-карточка сценария (внизу справа)
+       ============================================================ */
+    #ui-info {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      max-width: 340px;
+      background: rgba(10, 15, 35, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(80, 140, 255, 0.3);
+      border-radius: 8px;
+      padding: 14px 18px;
+      z-index: 10;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #a0b0dd;
+      transition: opacity 0.25s;
+    }
+    #ui-info h3 {
+      font-size: 13px;
+      color: #88bbff;
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    /* ============================================================
+       Карточка органеллы (внизу слева, при клике)
+       ============================================================ */
+    #ui-organelle {
+      position: fixed;
+      left: 300px;
+      bottom: 20px;
+      max-width: 380px;
+      max-height: 50vh;
+      overflow-y: auto;
+      background: rgba(10, 15, 35, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(150, 100, 255, 0.4);
+      border-radius: 8px;
+      padding: 16px 20px;
+      z-index: 11;
+      font-size: 12px;
+      line-height: 1.55;
+      color: #c0d0ff;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none;
+    }
+    #ui-organelle.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    #ui-organelle h3 {
+      font-size: 14px;
+      color: #cc99ff;
+      margin-bottom: 4px;
+      letter-spacing: 0.5px;
+    }
+    #ui-organelle .organelle-short {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #8877aa;
+      margin-bottom: 10px;
+    }
+    #ui-organelle p {
+      margin-bottom: 10px;
+      color: #a8b8dd;
+    }
+    #ui-organelle ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    #ui-organelle li {
+      position: relative;
+      padding-left: 16px;
+      margin-bottom: 4px;
+      font-size: 11.5px;
+      color: #90a0cc;
+    }
+    #ui-organelle li::before {
+      content: '·';
+      position: absolute;
+      left: 4px;
+      color: #88bbff;
+      font-weight: bold;
+    }
+
+    /* ============================================================
+       Легенда молекул (вверху справа)
+       ============================================================ */
+    #ui-legend {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(10, 15, 35, 0.8);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(80, 140, 255, 0.25);
+      border-radius: 8px;
+      padding: 12px 16px;
+      z-index: 10;
+      font-size: 11px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 4px 0;
+      color: #a0b0dd;
+    }
+    .legend-item .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    /* ============================================================
+       Подсказка управления (внизу по центру)
+       ============================================================ */
+    #ui-hint {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      color: #445588;
+      z-index: 10;
+      pointer-events: none;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    /* ============================================================
+       FPS-счётчик (внизу справа, над инфо-карточкой)
+       ============================================================ */
+    #fps-meter {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 6px 10px;
+      background: rgba(10, 15, 35, 0.8);
+      border: 1px solid rgba(80, 140, 255, 0.3);
+      border-radius: 6px;
+      font-size: 11px;
+      color: #88bbff;
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      z-index: 12;
+      pointer-events: none;
+    }
+
+    /* ============================================================
+       Адаптивность
+       ============================================================ */
+
+    /* Средние экраны — уменьшаем размеры панелей */
+    @media (max-width: 1200px) {
+      #ui-info {
+        max-width: 280px;
+        font-size: 11.5px;
+      }
+      #ui-organelle {
+        max-width: 320px;
+      }
+      #ui-hint {
+        display: none;
+      }
+    }
+
+    /* Планшеты — карточка органеллы снизу слева, но уже */
+    @media (max-width: 900px) {
+      #ui-panel {
+        width: 240px;
+        padding: 14px;
+      }
+      #ui-organelle {
+        left: 260px;
+        max-width: 280px;
+        padding: 12px 16px;
+      }
+      #ui-legend {
+        font-size: 10px;
+        padding: 10px 12px;
+      }
+      #ui-info {
+        max-width: 240px;
+        padding: 12px 14px;
+      }
+    }
+
+    /* Мобильные — минимум интерфейса, только панель и карточка сценария */
+    @media (max-width: 720px) {
+      #ui-panel {
+        width: 200px;
+        padding: 10px;
+      }
+      .ui-title h1 {
+        font-size: 15px;
+      }
+      .subtitle {
+        font-size: 9px;
+        margin-bottom: 12px;
+      }
+      .scenario-btn {
+        padding: 8px 10px;
+        font-size: 11.5px;
+      }
+
+      /* На мобильных карточку органеллы показываем поверх всего внизу */
+      #ui-organelle {
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        max-width: none;
+        max-height: 40vh;
+        padding: 12px 14px;
+        font-size: 11px;
+      }
+      #ui-organelle h3 {
+        font-size: 13px;
+      }
+      #ui-organelle p {
+        font-size: 11px;
+      }
+      #ui-organelle li {
+        font-size: 10.5px;
+      }
+
+      #ui-info {
+        left: 210px;
+        right: 10px;
+        bottom: 10px;
+        max-width: none;
+        font-size: 11px;
+        padding: 10px 12px;
+      }
+      #ui-info h3 {
+        font-size: 12px;
+      }
+
+      #ui-legend {
+        display: none;
+      }
+
+      #fps-meter {
+        top: 10px;
+        right: 10px;
+        bottom: auto;
+      }
+    }
+
+    /* Очень узкие экраны — прячем всё, кроме панели и карточки органеллы */
+    @media (max-width: 480px) {
+      #ui-panel {
+        width: 160px;
+        padding: 8px;
+      }
+      #ui-info {
+        left: 170px;
+      }
+    }
+
+    /* Скроллбар для панели и карточки органеллы в тёмном стиле */
+    #ui-panel::-webkit-scrollbar,
+    #ui-organelle::-webkit-scrollbar {
+      width: 6px;
+    }
+    #ui-panel::-webkit-scrollbar-track,
+    #ui-organelle::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #ui-panel::-webkit-scrollbar-thumb,
+    #ui-organelle::-webkit-scrollbar-thumb {
+      background: rgba(80, 140, 255, 0.3);
+      border-radius: 3px;
+    }
+    #ui-panel::-webkit-scrollbar-thumb:hover,
+    #ui-organelle::-webkit-scrollbar-thumb:hover {
+      background: rgba(80, 140, 255, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
