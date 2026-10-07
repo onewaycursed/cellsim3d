@@ -10,14 +10,12 @@ export class UIPanel {
   private scenarios: Scenario[];
   private callbacks: UIPanelCallbacks;
   private organelleCard: HTMLDivElement;
-  private infoCard: HTMLDivElement;
 
   constructor(scenarios: Scenario[], callbacks: UIPanelCallbacks) {
     this.scenarios = scenarios;
     this.callbacks = callbacks;
     this.render();
     this.organelleCard = document.getElementById('ui-organelle') as HTMLDivElement;
-    this.infoCard = document.getElementById('ui-info') as HTMLDivElement;
   }
 
   public setActive(id: string): void {
