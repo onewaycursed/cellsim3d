@@ -137,7 +137,6 @@ export class UIPanel {
       btn.addEventListener('click', () => {
         this.setActive(s.id);
         this.callbacks.onScenarioSelect(s);
-        // На мобильных закрываем меню после выбора сценария
         if (window.innerWidth <= 720) {
           this.panel.classList.remove('open');
           this.overlay.classList.remove('visible');
