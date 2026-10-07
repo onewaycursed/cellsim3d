@@ -9,15 +9,15 @@ export interface UIPanelCallbacks {
 export class UIPanel {
   private scenarios: Scenario[];
   private callbacks: UIPanelCallbacks;
-  private organelleCard: HTMLDivElement;
-  private infoCard: HTMLDivElement;
+  private organelleCard!: HTMLDivElement;
+  private panel!: HTMLDivElement;
+  private overlay!: HTMLDivElement;
 
   constructor(scenarios: Scenario[], callbacks: UIPanelCallbacks) {
     this.scenarios = scenarios;
     this.callbacks = callbacks;
     this.render();
-    this.organelleCard = document.getElementById('ui-organelle') as HTMLDivElement;
-    this.infoCard = document.getElementById('ui-info') as HTMLDivElement;
+    this.setupMobileMenu();
   }
 
   public setActive(id: string): void {
@@ -28,7 +28,6 @@ export class UIPanel {
     if (scenario) this.updateInfoCard(scenario);
   }
 
-  /** Показывает карточку элемента. null — скрывает. */
   public showElement(id: ElementId | null): void {
     if (!id) {
       this.organelleCard.classList.remove('visible');
@@ -36,12 +35,19 @@ export class UIPanel {
     }
     const info = ELEMENT_INFO[id];
     this.organelleCard.innerHTML = `
+      <button class="close-btn" aria-label="Закрыть">×</button>
       <h3>${info.title}</h3>
       <div class="organelle-short">${info.short}</div>
       <p>${info.description}</p>
       <ul>${info.facts.map(f => `<li>${f}</li>`).join('')}</ul>
     `;
     this.organelleCard.classList.add('visible');
+
+    const closeBtn = this.organelleCard.querySelector('.close-btn');
+    closeBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.organelleCard.classList.remove('visible');
+    });
   }
 
   private render(): void {
@@ -61,6 +67,7 @@ export class UIPanel {
     if (pathology.length) panel.appendChild(this.createSection('Патологии', pathology));
 
     document.body.appendChild(panel);
+    this.panel = panel;
 
     const info = document.createElement('div');
     info.id = 'ui-info';
@@ -70,6 +77,7 @@ export class UIPanel {
     const organelle = document.createElement('div');
     organelle.id = 'ui-organelle';
     document.body.appendChild(organelle);
+    this.organelleCard = organelle;
 
     const legend = document.createElement('div');
     legend.id = 'ui-legend';
@@ -84,9 +92,32 @@ export class UIPanel {
 
     const hint = document.createElement('div');
     hint.id = 'ui-hint';
-    hint.textContent =
-      'ЛКМ — вращение · Колесо — зум · ПКМ — панорама · Клик по органелле — описание';
+    hint.textContent = 'ЛКМ — вращение · Колесо — зум · Клик по органелле — описание';
     document.body.appendChild(hint);
+
+    const overlay = document.getElementById('overlay') as HTMLDivElement;
+    this.overlay = overlay;
+  }
+
+  private setupMobileMenu(): void {
+    const burger = document.getElementById('burger');
+    if (!burger) return;
+
+    burger.addEventListener('click', () => {
+      const isOpen = this.panel.classList.contains('open');
+      if (isOpen) {
+        this.panel.classList.remove('open');
+        this.overlay.classList.remove('visible');
+      } else {
+        this.panel.classList.add('open');
+        this.overlay.classList.add('visible');
+      }
+    });
+
+    this.overlay.addEventListener('click', () => {
+      this.panel.classList.remove('open');
+      this.overlay.classList.remove('visible');
+    });
   }
 
   private createSection(label: string, scenarios: Scenario[]): HTMLElement {
@@ -106,6 +137,11 @@ export class UIPanel {
       btn.addEventListener('click', () => {
         this.setActive(s.id);
         this.callbacks.onScenarioSelect(s);
+        // На мобильных закрываем меню после выбора сценария
+        if (window.innerWidth <= 720) {
+          this.panel.classList.remove('open');
+          this.overlay.classList.remove('visible');
+        }
       });
       section.appendChild(btn);
     });

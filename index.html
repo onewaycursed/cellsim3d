@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>CellSim 3D — интерактивный симулятор клетки</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -15,10 +15,11 @@
       font-family: 'Inter', system-ui, -apple-system, sans-serif;
       color: #e0e8ff;
       -webkit-font-smoothing: antialiased;
+      touch-action: none;
     }
 
     canvas { display: block; }
-    #app { width: 100%; height: 100%; }
+    #app { width: 100%; height: 100%; position: fixed; inset: 0; }
 
     /* ============================================================
        Левая панель со сценариями
@@ -29,13 +30,14 @@
       left: 0;
       width: 280px;
       height: 100%;
-      background: rgba(10, 15, 35, 0.85);
+      background: rgba(10, 15, 35, 0.9);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border-right: 1px solid rgba(80, 140, 255, 0.3);
       padding: 20px;
       overflow-y: auto;
-      z-index: 10;
+      z-index: 20;
+      transition: transform 0.3s ease;
     }
 
     .ui-title h1 {
@@ -82,10 +84,10 @@
       transition: all 0.15s;
       font-family: inherit;
     }
-    .scenario-btn:hover {
+    .scenario-btn:hover,
+    .scenario-btn:active {
       background: rgba(60, 90, 180, 0.5);
       border-color: rgba(120, 180, 255, 0.6);
-      transform: translateX(2px);
     }
     .scenario-btn.active {
       background: linear-gradient(90deg, rgba(80, 130, 255, 0.6), rgba(150, 80, 255, 0.6));
@@ -95,14 +97,57 @@
     }
 
     /* ============================================================
-       Инфо-карточка сценария (внизу справа)
+       Кнопка-гамбургер (показывается только на мобильных)
+       ============================================================ */
+    #burger {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 30;
+      width: 40px;
+      height: 40px;
+      background: rgba(10, 15, 35, 0.9);
+      border: 1px solid rgba(80, 140, 255, 0.4);
+      border-radius: 8px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    #burger svg {
+      width: 20px;
+      height: 20px;
+      stroke: #88bbff;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    /* Затемнение за панелью, когда она открыта на мобильных */
+    #overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 15;
+      display: none;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    #overlay.visible {
+      display: block;
+      opacity: 1;
+    }
+
+    /* ============================================================
+       Инфо-карточка сценария
        ============================================================ */
     #ui-info {
       position: fixed;
       bottom: 20px;
       right: 20px;
       max-width: 340px;
-      background: rgba(10, 15, 35, 0.85);
+      background: rgba(10, 15, 35, 0.9);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border: 1px solid rgba(80, 140, 255, 0.3);
@@ -112,7 +157,6 @@
       font-size: 12px;
       line-height: 1.5;
       color: #a0b0dd;
-      transition: opacity 0.25s;
     }
     #ui-info h3 {
       font-size: 13px;
@@ -122,7 +166,7 @@
     }
 
     /* ============================================================
-       Карточка органеллы (внизу слева, при клике)
+       Карточка органеллы (при клике)
        ============================================================ */
     #ui-organelle {
       position: fixed;
@@ -131,13 +175,13 @@
       max-width: 380px;
       max-height: 50vh;
       overflow-y: auto;
-      background: rgba(10, 15, 35, 0.92);
+      background: rgba(10, 15, 35, 0.95);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border: 1px solid rgba(150, 100, 255, 0.4);
       border-radius: 8px;
       padding: 16px 20px;
-      z-index: 11;
+      z-index: 12;
       font-size: 12px;
       line-height: 1.55;
       color: #c0d0ff;
@@ -188,14 +232,34 @@
       font-weight: bold;
     }
 
+    /* Кнопка закрытия карточки органеллы */
+    #ui-organelle .close-btn {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      width: 24px;
+      height: 24px;
+      border: none;
+      background: transparent;
+      color: #8877aa;
+      font-size: 18px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0;
+      display: none;
+    }
+    #ui-organelle.visible .close-btn {
+      display: block;
+    }
+
     /* ============================================================
-       Легенда молекул (вверху справа)
+       Легенда молекул
        ============================================================ */
     #ui-legend {
       position: fixed;
       top: 20px;
       right: 20px;
-      background: rgba(10, 15, 35, 0.8);
+      background: rgba(10, 15, 35, 0.85);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border: 1px solid rgba(80, 140, 255, 0.25);
@@ -219,7 +283,7 @@
     }
 
     /* ============================================================
-       Подсказка управления (внизу по центру)
+       Подсказка управления
        ============================================================ */
     #ui-hint {
       position: fixed;
@@ -235,156 +299,156 @@
     }
 
     /* ============================================================
-       FPS-счётчик (внизу справа, над инфо-карточкой)
+       FPS-счётчик
        ============================================================ */
     #fps-meter {
       position: fixed;
       bottom: 20px;
       right: 20px;
       padding: 6px 10px;
-      background: rgba(10, 15, 35, 0.8);
+      background: rgba(10, 15, 35, 0.85);
       border: 1px solid rgba(80, 140, 255, 0.3);
       border-radius: 6px;
       font-size: 11px;
       color: #88bbff;
-      font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+      font-family: ui-monospace, monospace;
       z-index: 12;
       pointer-events: none;
     }
 
-    /* ============================================================
-       Адаптивность
-       ============================================================ */
-
-    /* Средние экраны — уменьшаем размеры панелей */
-    @media (max-width: 1200px) {
-      #ui-info {
-        max-width: 280px;
-        font-size: 11.5px;
-      }
-      #ui-organelle {
-        max-width: 320px;
-      }
-      #ui-hint {
-        display: none;
-      }
-    }
-
-    /* Планшеты — карточка органеллы снизу слева, но уже */
-    @media (max-width: 900px) {
-      #ui-panel {
-        width: 240px;
-        padding: 14px;
-      }
-      #ui-organelle {
-        left: 260px;
-        max-width: 280px;
-        padding: 12px 16px;
-      }
-      #ui-legend {
-        font-size: 10px;
-        padding: 10px 12px;
-      }
-      #ui-info {
-        max-width: 240px;
-        padding: 12px 14px;
-      }
-    }
-
-    /* Мобильные — минимум интерфейса, только панель и карточка сценария */
-    @media (max-width: 720px) {
-      #ui-panel {
-        width: 200px;
-        padding: 10px;
-      }
-      .ui-title h1 {
-        font-size: 15px;
-      }
-      .subtitle {
-        font-size: 9px;
-        margin-bottom: 12px;
-      }
-      .scenario-btn {
-        padding: 8px 10px;
-        font-size: 11.5px;
-      }
-
-      /* На мобильных карточку органеллы показываем поверх всего внизу */
-      #ui-organelle {
-        left: 10px;
-        right: 10px;
-        bottom: 10px;
-        max-width: none;
-        max-height: 40vh;
-        padding: 12px 14px;
-        font-size: 11px;
-      }
-      #ui-organelle h3 {
-        font-size: 13px;
-      }
-      #ui-organelle p {
-        font-size: 11px;
-      }
-      #ui-organelle li {
-        font-size: 10.5px;
-      }
-
-      #ui-info {
-        left: 210px;
-        right: 10px;
-        bottom: 10px;
-        max-width: none;
-        font-size: 11px;
-        padding: 10px 12px;
-      }
-      #ui-info h3 {
-        font-size: 12px;
-      }
-
-      #ui-legend {
-        display: none;
-      }
-
-      #fps-meter {
-        top: 10px;
-        right: 10px;
-        bottom: auto;
-      }
-    }
-
-    /* Очень узкие экраны — прячем всё, кроме панели и карточки органеллы */
-    @media (max-width: 480px) {
-      #ui-panel {
-        width: 160px;
-        padding: 8px;
-      }
-      #ui-info {
-        left: 170px;
-      }
-    }
-
-    /* Скроллбар для панели и карточки органеллы в тёмном стиле */
+    /* Скроллбар */
     #ui-panel::-webkit-scrollbar,
     #ui-organelle::-webkit-scrollbar {
       width: 6px;
-    }
-    #ui-panel::-webkit-scrollbar-track,
-    #ui-organelle::-webkit-scrollbar-track {
-      background: transparent;
     }
     #ui-panel::-webkit-scrollbar-thumb,
     #ui-organelle::-webkit-scrollbar-thumb {
       background: rgba(80, 140, 255, 0.3);
       border-radius: 3px;
     }
-    #ui-panel::-webkit-scrollbar-thumb:hover,
-    #ui-organelle::-webkit-scrollbar-thumb:hover {
-      background: rgba(80, 140, 255, 0.5);
+
+    /* ============================================================
+       Адаптивность
+       ============================================================ */
+
+    /* Средние экраны — уменьшаем карточки */
+    @media (max-width: 1200px) {
+      #ui-info { max-width: 280px; font-size: 11.5px; }
+      #ui-organelle { max-width: 320px; }
+      #ui-hint { display: none; }
+    }
+
+    /* Планшеты */
+    @media (max-width: 900px) {
+      #ui-panel { width: 240px; }
+      #ui-organelle { left: 260px; max-width: 280px; }
+      #ui-legend { font-size: 10px; padding: 10px 12px; }
+      #ui-info { max-width: 240px; padding: 12px 14px; }
+    }
+
+    /* ============================================================
+       Мобильные — панель в бургер-меню
+       ============================================================ */
+    @media (max-width: 720px) {
+      /* Показываем кнопку-гамбургер */
+      #burger { display: flex; }
+
+      /* Панель выезжает слева, по умолчанию спрятана */
+      #ui-panel {
+        width: 260px;
+        padding: 16px;
+        transform: translateX(-100%);
+        background: rgba(10, 15, 35, 0.97);
+      }
+      #ui-panel.open {
+        transform: translateX(0);
+      }
+
+      /* Сдвигаем заголовок вниз от бургера */
+      .ui-title h1 {
+        font-size: 16px;
+        margin-top: 40px;
+      }
+      .subtitle {
+        font-size: 9px;
+        margin-bottom: 12px;
+      }
+      .scenario-btn {
+        padding: 10px 12px;
+        font-size: 12px;
+        margin-bottom: 5px;
+      }
+
+      /* Инфо-карточка внизу на всю ширину */
+      #ui-info {
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        max-width: none;
+        padding: 10px 14px;
+        font-size: 11px;
+      }
+      #ui-info h3 {
+        font-size: 12px;
+        margin-bottom: 4px;
+      }
+
+      /* Карточка органеллы поверх всего внизу */
+      #ui-organelle {
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        max-width: none;
+        max-height: 45vh;
+        padding: 14px 16px;
+        font-size: 11px;
+      }
+      #ui-organelle h3 { font-size: 13px; padding-right: 24px; }
+      #ui-organelle p { font-size: 11px; }
+      #ui-organelle li { font-size: 10.5px; }
+
+      /* Легенду прячем в бургер-меню, чтобы не мешала */
+      #ui-legend {
+        top: 12px;
+        right: 12px;
+        font-size: 10px;
+        padding: 8px 10px;
+      }
+      #ui-legend .legend-item {
+        margin: 3px 0;
+      }
+
+      /* FPS-счётчик в правом верхнем углу */
+      #fps-meter {
+        top: 12px;
+        right: 12px;
+        bottom: auto;
+        font-size: 10px;
+        padding: 5px 8px;
+      }
+    }
+
+    /* Очень узкие экраны — прячем легенду */
+    @media (max-width: 500px) {
+      #ui-legend { display: none; }
     }
   </style>
 </head>
 <body>
   <div id="app"></div>
+
+  <!-- Кнопка-гамбургер для мобильных -->
+  <button id="burger" aria-label="Меню">
+    <svg viewBox="0 0 24 24">
+      <line x1="3" y1="6" x2="21" y2="6"/>
+      <line x1="3" y1="12" x2="21" y2="12"/>
+      <line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
+
+  <!-- Затемнение за панелью -->
+  <div id="overlay"></div>
+
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

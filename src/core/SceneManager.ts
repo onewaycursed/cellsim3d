@@ -9,6 +9,11 @@ export interface SceneManagerOptions {
   container: HTMLElement;
 }
 
+/** Определяет, мобильное ли устройство. */
+function isMobileDevice(): boolean {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 export class SceneManager {
   public readonly scene: THREE.Scene;
   public readonly camera: THREE.PerspectiveCamera;
@@ -18,8 +23,11 @@ export class SceneManager {
   private composer: EffectComposer;
   private clock = new THREE.Clock();
   private updateCallbacks: Array<(dt: number, elapsed: number) => void> = [];
+  private isMobile: boolean;
 
   constructor({ container }: SceneManagerOptions) {
+    this.isMobile = isMobileDevice();
+
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(BACKGROUND_COLOR);
     this.scene.fog = new THREE.FogExp2(BACKGROUND_COLOR, 0.012);
@@ -34,23 +42,31 @@ export class SceneManager {
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setSize(container.clientWidth, container.clientHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    // На мобильных ограничиваем pixel ratio для производительности
+    const maxPixelRatio = this.isMobile ? 1.5 : 2;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
+
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.95;
+    this.renderer.toneMappingExposure = this.isMobile ? 1.0 : 0.95;
     container.appendChild(this.renderer.domElement);
 
-    // Постобработка с bloom
+    // Постобработка
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
 
-   const bloom = new UnrealBloomPass(
-  new THREE.Vector2(container.clientWidth, container.clientHeight),
-  0.45,  // strength — было 0.8
-  0.5,   // radius — было 0.6
-  0.85   // threshold — было 0.7
-);
-    this.composer.addPass(bloom);
+    // Bloom только на десктопе — на мобильных отключаем для FPS
+    if (!this.isMobile) {
+      const bloom = new UnrealBloomPass(
+        new THREE.Vector2(container.clientWidth, container.clientHeight),
+        0.45,  // strength
+        0.5,   // radius
+        0.85   // threshold
+      );
+      this.composer.addPass(bloom);
+    }
 
+    // Орбитальные контролы
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.06;
@@ -58,6 +74,14 @@ export class SceneManager {
     this.controls.maxDistance = 40;
     this.controls.autoRotate = true;
     this.controls.autoRotateSpeed = 0.4;
+
+    // На тач-устройствах настраиваем жесты
+    if (this.isMobile) {
+      this.controls.touches = {
+        ONE: THREE.TOUCH.ROTATE,
+        TWO: THREE.TOUCH.DOLLY_PAN
+      };
+    }
 
     this.setupLights();
     this.setupResize(container);
@@ -89,13 +113,19 @@ export class SceneManager {
   }
 
   private setupResize(container: HTMLElement): void {
-    window.addEventListener('resize', () => {
+    const onResize = () => {
       const w = container.clientWidth;
       const h = container.clientHeight;
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(w, h);
       this.composer.setSize(w, h);
+    };
+
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', () => {
+      // Небольшая задержка, чтобы браузер успел пересчитать размеры
+      setTimeout(onResize, 100);
     });
   }
 
